@@ -8,7 +8,8 @@ class K8s_Analyzer:
     """
     """
     repo_name="kubernetes/kubernetes"
-    self.repo = Github("grodrigues3", '0b066e801b2e38b078dc420ef11e55298e277c97').get_repo(repo_name)
+    password = raw_input("Enter your github oauth token")
+    self.repo = Github("grodrigues3", password).get_repo(repo_name)
     self.routing_labels = ["area", "component", "team"]
     self.labels = []
 
