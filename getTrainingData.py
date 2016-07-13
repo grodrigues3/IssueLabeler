@@ -1,6 +1,10 @@
+"""
+Deprecated.  This accesses the label data directly through github
+Use Antoines sql interface instead
+"""
 from github import Github
 from collections import Counter, defaultdict
-import datetime, pdb
+import datetime
 
 class K8s_Analyzer:
 
