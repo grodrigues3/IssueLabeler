@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 from scipy.sparse import csr_matrix
 import time
 from collections import Counter
-from label_stats import IssueStats
+from get_issues_labels import IssueStats
 
 
 import pdb
@@ -34,7 +34,23 @@ with open("./data/stopwords.txt", 'r') as f:
   stopwords = [word.strip() for word in f]
 
 
-def get_titles_and_labels(datafn, labelfn, maxCount=5000):
+def get_labels():
+  """
+  Load in the body and title
+    - remove punctuation
+    - remove stopwords
+    - stem the existing words
+  Load in the labels
+
+  """
+  print "Loading Just The Labels..."
+  labels = []
+  iStats = IssueStats()
+  for i, data in enumerate(iStats.get_training_examples()):
+    labels += data[1],
+  return labels
+
+def get_titles_and_labels():
   """
   Load in the body and title
     - remove punctuation
@@ -44,7 +60,7 @@ def get_titles_and_labels(datafn, labelfn, maxCount=5000):
 
   """
   print "Loading Titles and Labels To Be Used For Training Data..."
-  titles_and_body, labels = [], [] 
+  titles_and_body, labels = [], []
   iStats = IssueStats()
   myStemmer = PorterStemmer()
   tokenizer = RegexpTokenizer(r'\w+')
@@ -153,25 +169,26 @@ def perform_cross_validation():
           c += 1
           if c % 5 == 0:
             print c, 'models trained out of', toDo
-  #g.close()
   print best_params
   print best
 
 
 
-def plot_confusion_matrix(cm, title='Confusion matrix', cmap=plt.cm.Blues):
+def plot_confusion_matrix(cm, labels, title='Confusion matrix', cmap=plt.cm.Blues):
       plt.imshow(cm, interpolation='nearest', cmap=cmap)
       plt.title(title)
       plt.colorbar()
-      tick_marks = np.arange(len(iris.target_names))
-      plt.xticks(tick_marks, iris.target_names, rotation=45)
-      plt.yticks(tick_marks, iris.target_names)
+      tick_marks = np.arange(len(labels))
+      print labels
+      plt.xticks(tick_marks, labels, rotation=45)
+      plt.yticks(tick_marks, labels)
       plt.tight_layout()
       plt.ylabel('True label')
       plt.xlabel('Predicted label')
+      plt.show()
 
 if __name__ == "__main__":
-  #titles, labels = get_titles_and_labels(datafn, labelfn)
+  #titles, labels = get_titles_and_labels()
   #count_words(titles)
   #t, l, h, e =  encode_titles_labels(titles, labels, numFeatures = 8192)
   data_persistence = "tMat_8192.npz"
@@ -182,9 +199,7 @@ if __name__ == "__main__":
   mod = build_lr_model(train_mat, train_labels, *best_params) #myLoss=loss, myPenalty=penalty, myAlpha=alpha)
   predicted_labels = mod.predict(test_mat)
   true_txt_labels = e.inverse_transform(test_labels)
+  txt_labels = list(set(get_labels()))
   predicted_txt_labels = e.inverse_transform(predicted_labels)
-  for x,y in zip(true_txt_labels, predicted_txt_labels):
-    print x,y
-  cm = confusion_matrix(true_txt_labels, predicted_txt_labels)
-  pdb.set_trace()
-  print cm
+  cm = confusion_matrix(true_txt_labels, predicted_txt_labels, labels=txt_labels[:10])[:10, :10]
+  plot_confusion_matrix(cm, txt_labels[:10])
