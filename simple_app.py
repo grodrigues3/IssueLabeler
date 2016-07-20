@@ -24,4 +24,4 @@ def handle_txt():
     vec = hasher.transform([title+" "+body])
     label = mod.predict(vec)[0]
     return label
-app.run()
+app.run(host="0.0.0.0")
