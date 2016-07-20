@@ -34,8 +34,6 @@ labelfn = "./data/training_labels.txt"
 testfn = "./data/test_data.txt"
 DATAPERSISTENCE = "persistence/tMat_8192.npz"
 PICKLEFN = "pkld/trained_model.pkl"
-with open("./data/stopwords.txt", 'r') as f:
-  stopwords = [word.strip() for word in f]
 
 
 def get_labels():
@@ -65,6 +63,14 @@ def get_titles_and_labels():
   Load in the labels
 
   """
+  stop_fn = raw_input("Provide a file containing stopwords with one word per line")
+  try:
+    if not stopwords:
+      stop_fn = "./data/stopwords.txt"
+    with open(stop_fn, 'r') as f:
+      stopwords = [word.strip() for word in f]
+  except:
+    stopwords = [] #don't remove any stopwords
   print "Loading Titles and Labels To Be Used For Training Data..."
   titles_and_body, labels = [], []
   iStats = IssueStats()

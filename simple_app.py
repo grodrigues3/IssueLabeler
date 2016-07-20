@@ -3,7 +3,6 @@
 TODO(grod): DO NOT SUBMIT without a detailed description of simple_app.
 """
 
-import pdb
 from flask import Flask, request
 from transform import PICKLEFN, DATAPERSISTENCE, load_model, load_sparse_csr
 import logging 
@@ -18,7 +17,6 @@ def handle_txt():
     hasher = load_sparse_csr(DATAPERSISTENCE)[-1].item()
     mod = load_model(PICKLEFN)
     vec = hasher.transform([title+" "+body])
-    pdb.set_trace()
     label = mod.predict(vec)[0]
     return label
 
