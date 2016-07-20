@@ -19,7 +19,6 @@ from sklearn.externals import joblib
 from nltk.stem.porter import PorterStemmer
 from nltk.tokenize import RegexpTokenizer
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.sparse import csr_matrix
 import time
 from collections import Counter
@@ -181,22 +180,7 @@ def perform_cross_validation(titles, labels):
           c += 1
           if c % 5 == 0:
             print c, 'models trained out of', toDo
-    return best_params, best_score
-
-
-def plot_confusion_matrix(cm, labels, title='Confusion matrix', cmap=plt.cm.Blues):
-      plt.imshow(cm, interpolation='nearest', cmap=cmap)
-      plt.title(title)
-      plt.colorbar()
-      tick_marks = np.arange(len(labels))
-      print labels
-      plt.xticks(tick_marks, labels, rotation=45)
-      plt.yticks(tick_marks, labels)
-      plt.tight_layout()
-      plt.ylabel('True label')
-      plt.xlabel('Predicted label')
-      plt.show()
-
+  return best_params, best_score
 
 def save_model(mod, PICKLEFN):
   return joblib.dump(mod,PICKLEFN)
@@ -216,7 +200,6 @@ if __name__ == "__main__":
   predicted_labels = mod.predict(test_mat)
   txt_labels = list(set(get_labels()))
   cm = confusion_matrix(test_labels, predicted_labels, labels=txt_labels[:10])[:10, :10]
-  plot_confusion_matrix(cm, txt_labels[:10])
   """
   labels, counts = get_labels()
   print "Total Labels", sum(counts.values()), len(labels)
