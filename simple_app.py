@@ -9,16 +9,19 @@ import logging
 
 app = Flask(__name__)
 myLogger = logging.getLogger()
-@app.route("/", methods = ["POST"])
+@app.route("/", methods = ["GET", "POST"])
 def handle_txt():
     myLogger.info("hit the / endpoint and in the handler")
-    title = request.form.get('title', "")
-    body = request.form.get('body', "")
+    if request.method == "POST":
+      title = request.form.get('title', "")
+      body = request.form.get('body', "")
+    else:
+      title = request.args.get('title', "")
+      body = request.args.get('body', "")
+
     hasher = load_sparse_csr(DATAPERSISTENCE)[-1].item()
     mod = load_model(PICKLEFN)
     vec = hasher.transform([title+" "+body])
     label = mod.predict(vec)[0]
     return label
-
-
 app.run()
