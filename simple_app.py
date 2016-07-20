@@ -3,20 +3,24 @@
 TODO(grod): DO NOT SUBMIT without a detailed description of simple_app.
 """
 
-from flask import Flask, request
-import logging
 import pdb
+from flask import Flask, request
+from transform import PICKLEFN, DATAPERSISTENCE, load_model, load_sparse_csr
+import logging 
+
 app = Flask(__name__)
 myLogger = logging.getLogger()
-
-
 @app.route("/", methods = ["POST"])
 def handle_txt():
-    title = request.args.get('title', "")
-    body = request.args.get('body', "")
+    myLogger.info("hit the / endpoint and in the handler")
+    title = request.form.get('title', "")
+    body = request.form.get('body', "")
+    hasher = load_sparse_csr(DATAPERSISTENCE)[-1].item()
+    mod = load_model(PICKLEFN)
+    vec = hasher.transform([title+" "+body])
     pdb.set_trace()
-    toRet = "Hello World " + title + body 
-    return toRet
+    label = mod.predict(vec)[0]
+    return label
 
 
 app.run()

@@ -6,6 +6,7 @@
 5. Perform validation to approximate real-world performance
 6. Test of new data
 """
+from collections import defaultdict
 from sklearn.feature_extraction import FeatureHasher
 from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LassoCV
@@ -13,7 +14,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model import SGDClassifier
 from sklearn.cross_validation import train_test_split
 from sklearn.metrics import confusion_matrix
-
+from sklearn.externals import joblib
 
 from nltk.stem.porter import PorterStemmer
 from nltk.tokenize import RegexpTokenizer
@@ -23,13 +24,16 @@ from scipy.sparse import csr_matrix
 import time
 from collections import Counter
 from get_issues_labels import IssueStats
-
-
 import pdb
+
+
+
 #Parameters
 datafn = "./data/training_data.txt"
 labelfn = "./data/training_labels.txt"
 testfn = "./data/test_data.txt"
+DATAPERSISTENCE = "persistence/tMat_8192.npz"
+PICKLEFN = "pkld/trained_model.pkl"
 with open("./data/stopwords.txt", 'r') as f:
   stopwords = [word.strip() for word in f]
 
@@ -46,9 +50,11 @@ def get_labels():
   print "Loading Just The Labels..."
   labels = []
   iStats = IssueStats()
+  counts = defaultdict(lambda:0)
   for i, data in enumerate(iStats.get_training_examples()):
     labels += data[1],
-  return labels
+    counts[labels[-1]] += 1
+  return labels, counts
 
 def get_titles_and_labels():
   """
@@ -71,14 +77,16 @@ def get_titles_and_labels():
   return titles_and_body, labels
 
 
-def encode_titles_labels(titles, labels, numFeatures= 2**14):
+def encode_titles(titles, numFeatures= 2**14):
   print "Encoding titles and labels to numerical values..."
   myHasher = FeatureHasher(input_type="string", n_features= numFeatures, non_negative=True)
-  myEncoder = LabelEncoder()
+  #myEncoder = LabelEncoder()
   featureMatrix = myHasher.transform(titles)
-  myEncoder.fit(labels)
-  encoded = myEncoder.transform(labels)
-  return featureMatrix, encoded, myHasher, myEncoder
+  #myEncoder.fit(labels)
+  #encoded = myEncoder.transform(labels)
+  #don't have to encode labels for newer sklearn models, string labels are fine
+  return featureMatrix, myHasher#, myEncoder
+
 
 def build_lr_model(encoded_titles, encoded_labels, myLoss= 'log', myPenalty = 'l2', myAlpha = .0001):
   print "Training a Model..."
@@ -115,7 +123,7 @@ def count_words(titles):
   print len(mySet), "unique words"
 
 
-def save_sparse(fn, titleMatrix, labels, hasher, encoder):
+def save_sparse(fn, titleMatrix, labels, hasher):
   """
   Store a local copy of the sparse matrix on disk so that we don't
   have to perform punctuation stripping, stopword removal, and feature hashign
@@ -125,7 +133,6 @@ def save_sparse(fn, titleMatrix, labels, hasher, encoder):
                "indptr" : titleMatrix.indptr,
                "shape"  : titleMatrix.shape,
                "data"   : titleMatrix.data,
-               "encoder" : encoder,
                "hasher" : hasher,
                "labels" : labels}
   np.savez(fn, **data_dict)
@@ -133,12 +140,11 @@ def save_sparse(fn, titleMatrix, labels, hasher, encoder):
 
 def load_sparse_csr(fn):
   myLoader = np.load(fn)
-  return csr_matrix((  myLoader['data'], myLoader['indices'], myLoader['indptr']),
-                    shape = myLoader['shape']), myLoader["labels"], myLoader["hasher"], myLoader["encoder"].item()
+  return csr_matrix(( myLoader['data'], myLoader['indices'], myLoader['indptr']),
+                    shape = myLoader['shape']), myLoader["labels"], myLoader["hasher"]
 
 
-
-def perform_cross_validation():
+def perform_cross_validation(titles, labels):
   best = 0.0
   best_params = None
   c = 0
@@ -151,14 +157,14 @@ def perform_cross_validation():
   #g = open('cv_finer_tuned.csv', 'w')
   #g.write("NumFeatures, Loss, Alpha, Penalty, Score\n")
   for nn in numFeatures:
-    t, l, h, e =  encode_titles_labels(titles, labels, numFeatures = nn)
-    train_mat, test_mat, train_labels, test_labels = train_test_split(t, l, random_state=int(time.time()), test_size=.2)
+    trainingMat, myHasher =  encode_titles(titles, numFeatures = nn)
+    train_mat, test_mat, train_labels, test_labels = train_test_split(trainingMat, labels, random_state=int(time.time()), test_size=.2)
     for loss in losses:
       for penalty in penalties:
         for alpha in alphas:
           #build and train the model
           mod = build_lr_model(train_mat, train_labels, myLoss=loss, myPenalty=penalty, myAlpha=alpha)
-          score = test_model(mod, h, e, testMat=test_mat, testLabels=test_labels)
+          score = test_model(mod, myHasher, e, testMat=test_mat, testLabels=test_labels)
 
           #bookkeeping
           params = (nn, loss, alpha, penalty, score)
@@ -169,9 +175,7 @@ def perform_cross_validation():
           c += 1
           if c % 5 == 0:
             print c, 'models trained out of', toDo
-  print best_params
-  print best
-
+    return best_params, best_score
 
 
 def plot_confusion_matrix(cm, labels, title='Confusion matrix', cmap=plt.cm.Blues):
@@ -187,19 +191,37 @@ def plot_confusion_matrix(cm, labels, title='Confusion matrix', cmap=plt.cm.Blue
       plt.xlabel('Predicted label')
       plt.show()
 
+
+def save_model(mod, PICKLEFN):
+  return joblib.dump(mod,PICKLEFN)
+
+def load_model(PICKLEFN):
+  return joblib.load(PICKLEFN)
+
 if __name__ == "__main__":
-  #titles, labels = get_titles_and_labels()
-  #count_words(titles)
-  #t, l, h, e =  encode_titles_labels(titles, labels, numFeatures = 8192)
-  data_persistence = "tMat_8192.npz"
-  #save_sparse(data_persistence, t, l, h, e)
-  tMat, labels, h, e = load_sparse_csr(data_persistence)
+  """
+  titles, labels = get_titles_and_labels()
+  trainingMat8192, hasher=  encode_titles(titles, numFeatures = 8192)
+  save_sparse(DATAPERSISTENCE, trainingMat8192, labels, hasher)
+  tMat, numericLabels, hasher = load_sparse_csr(DATAPERSISTENCE)
   train_mat, test_mat, train_labels, test_labels = train_test_split(tMat, labels, random_state=int(time.time()), test_size=.2)
-  best_params = 'hinge', 'l2', .01, 
+  best_params = 'hinge', 'l2', .1, 
   mod = build_lr_model(train_mat, train_labels, *best_params) #myLoss=loss, myPenalty=penalty, myAlpha=alpha)
   predicted_labels = mod.predict(test_mat)
-  true_txt_labels = e.inverse_transform(test_labels)
   txt_labels = list(set(get_labels()))
-  predicted_txt_labels = e.inverse_transform(predicted_labels)
-  cm = confusion_matrix(true_txt_labels, predicted_txt_labels, labels=txt_labels[:10])[:10, :10]
+  cm = confusion_matrix(test_labels, predicted_labels, labels=txt_labels[:10])[:10, :10]
   plot_confusion_matrix(cm, txt_labels[:10])
+  """
+  labels, counts = get_labels()
+  print "Total Labels", sum(counts.values()), len(labels)
+  for thing in sorted(counts, key= counts.get, reverse=True):
+    print thing, counts[thing]
+  exit()
+
+  _, _, myHasher = load_sparse_csr(DATAPERSISTENCE)
+  myHasher = myHasher.item()
+  pdb.set_trace()
+  while 1:
+    data = raw_input("Give me an example issue body\n")
+    example = myHasher.transform([data])
+    print mod.predict(example)
