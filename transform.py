@@ -53,6 +53,23 @@ def get_labels():
     counts[labels[-1]] += 1
   return labels, counts
 
+
+myStemmer = PorterStemmer()
+tokenizer = RegexpTokenizer(r'\w+')
+#stop_fn = raw_input("Provide a file containing stopwords with one word per line")
+try:
+  stop_words = []
+  if not stopwords:
+    stop_fn = "./data/stopwords.txt"
+  with open(stop_fn, 'r') as f:
+    stopwords = [word.strip() for word in f]
+except:
+  stopwords = [] #don't remove any stopwords
+
+def tokenize_stem_stop(inputString):
+    curTitleBody = tokenizer.tokenize(inputString.decode('utf-8').lower())
+    return map(myStemmer.stem, filter(lambda x: x not in stopwords, curTitleBody))
+
 def get_titles_and_labels():
   """
   Load in the body and title
@@ -60,24 +77,12 @@ def get_titles_and_labels():
     - remove stopwords
     - stem the existing words
   Load in the labels
-
   """
-  stop_fn = raw_input("Provide a file containing stopwords with one word per line")
-  try:
-    if not stopwords:
-      stop_fn = "./data/stopwords.txt"
-    with open(stop_fn, 'r') as f:
-      stopwords = [word.strip() for word in f]
-  except:
-    stopwords = [] #don't remove any stopwords
   print "Loading Titles and Labels To Be Used For Training Data..."
   titles_and_body, labels = [], []
   iStats = IssueStats()
-  myStemmer = PorterStemmer()
-  tokenizer = RegexpTokenizer(r'\w+')
   for i, data in enumerate(iStats.get_training_examples()):
-    title = tokenizer.tokenize(data[0].decode('utf-8').lower())  
-    titles_and_body += map(myStemmer.stem, filter(lambda x: x not in stopwords, title)), # title.split())),
+    titles_and_body += tokenize_stem_stop(data[0]),
     labels += data[1],
   return titles_and_body, labels
 
@@ -189,7 +194,6 @@ def load_model(PICKLEFN):
   return joblib.load(PICKLEFN)
 
 if __name__ == "__main__":
-  """
   titles, labels = get_titles_and_labels()
   trainingMat8192, hasher=  encode_titles(titles, numFeatures = 8192)
   save_sparse(DATAPERSISTENCE, trainingMat8192, labels, hasher)
@@ -198,9 +202,9 @@ if __name__ == "__main__":
   best_params = 'hinge', 'l2', .1, 
   mod = build_lr_model(train_mat, train_labels, *best_params) #myLoss=loss, myPenalty=penalty, myAlpha=alpha)
   predicted_labels = mod.predict(test_mat)
+  """
   txt_labels = list(set(get_labels()))
   cm = confusion_matrix(test_labels, predicted_labels, labels=txt_labels[:10])[:10, :10]
-  """
   labels, counts = get_labels()
   print "Total Labels", sum(counts.values()), len(labels)
   for thing in sorted(counts, key= counts.get, reverse=True):
@@ -214,3 +218,4 @@ if __name__ == "__main__":
     data = raw_input("Give me an example issue body\n")
     example = myHasher.transform([data])
     print mod.predict(example)
+  """
