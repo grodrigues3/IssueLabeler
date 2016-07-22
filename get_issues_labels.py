@@ -11,8 +11,9 @@ curValidLabels = "./currentRouting.txt"
 
 class IssueStats:
   def __init__(self):
-    self.datafn = "./data/raw_data.csv"
-    self.labels = ['component', 'team', 'area']
+    #self.datafn = "./data/raw_data.csv"
+    self.datafn = "./data/manyLabels.csv"
+    self.labels = ['area', 'component', 'team']
     self.fieldnames = ['body', 'title'] + self.labels
     self.issueCnt = defaultdict(lambda: defaultdict(lambda:0))
     self.allCounts = defaultdict(lambda:0)
@@ -41,7 +42,7 @@ class IssueStats:
     currentLabels = filter(lambda x: x in self.currentLabels, self.allCounts.keys())
     myLabels = {k:i for i, k in enumerate(currentLabels)}
     numLabels = len(myLabels)
-    corMat = [ [0]* numLabels for i in range(numLabels)] #numLabels x numLabels matrix
+    corMat = [[0]* numLabels for i in range(numLabels)] #numLabels x numLabels matrix
     with open(self.datafn, 'r') as f:
       dr = DictReader(f, fieldnames= self.fieldnames)
       for i, line in enumerate(dr):
@@ -54,7 +55,7 @@ class IssueStats:
             lineLabels += theLabel, 
         for a,b in product(lineLabels, lineLabels):
           x,y = myLabels[a], myLabels[b]
-          corMat[x][y] +=1 
+          corMat[x][y] +=1
 
     highest = []
     for i, row in enumerate(corMat):
@@ -75,21 +76,29 @@ class IssueStats:
 
 
 
-  def get_training_examples(self):
+  def get_training_examples(self, which_label='team'):
     with open(self.datafn, 'r') as f:
       dr = DictReader(f, fieldnames= self.fieldnames)
+
       for i, line in enumerate(dr):
-        poss_labels = []
-        # right now, enforce a single label 
-        # if there's a component use it, otherwise team, otherwise area
-        for label in self.labels:
+        if which_label in self.labels:
+          if line[which_label] in ["NULL", ""]:
+            continue
+          retLabel = line[which_label]
+          if ";" in retLabel: #more than one team
+            retLabel = max(retLabel.split(";"), key = self.allCounts.get)
+        else:
           poss = []
-          if line[label] not in ["NULL", ""]:
-            poss += (self.issueCnt[label][line[label]], line[label]),
+          for label in self.labels:
+            retLabel = line[label]
+            if retLabel not in ["NULL", ""]:
+              #if ";" in retLabel: #more than one team
+                #retLabel = max(retLabel.split(";"), key = self.allCounts.get)
+              poss += retLabel, 
           if not poss:
             continue
-          best_label = max(poss, key = self.issueCnt.get)[1] #get the most commonly used label
-          yield line['title'] + " " + line['body'],  best_label
+          retLabel = max(poss, key = self.allCounts.get) #get the most commonly used label
+        yield line['title'] + " " + line['body'],  retLabel
 
   def pretty_print(self):
     for broad_cat, spec_cat_count in self.issueCnt.iteritems():
