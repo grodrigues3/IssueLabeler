@@ -7,7 +7,6 @@ try:
 except:
   pass
 
-curValidLabels = "./currentRouting.txt"
 
 class IssueStats:
   def __init__(self):
@@ -17,7 +16,8 @@ class IssueStats:
     self.fieldnames = ['body', 'title'] + self.labels
     self.issueCnt = defaultdict(lambda: defaultdict(lambda:0))
     self.allCounts = defaultdict(lambda:0)
-    self.recently_deleted = defaultdict(lambda:0)
+    #self.recently_deleted = defaultdict(lambda:0)
+    curValidLabels = "./currentRouting.txt"
     with open(curValidLabels, 'r') as f:
       self.currentLabels = set(map(lambda x: x.strip(), f.readlines()))
     self._get_counts()
@@ -28,22 +28,23 @@ class IssueStats:
       for i, line in enumerate(dr):
         for label in self.labels:
           theLabel = line[label]
-          if theLabel in ["NULL", ""]:
+          if theLabel in ["NULL", ""] or theLabel not in self.currentLabels:
             pass
-          elif theLabel not in self.currentLabels:
-            self.recently_deleted[theLabel] += 1
           else: #good label
-            self.issueCnt[label][theLabel] += 1
-            self.allCounts[theLabel] += 1
+            curLabs = theLabel.split(";")
+            for l in curLabs:
+              if l in self.currentLabels:
+                self.issueCnt[label][l] += 1
+                self.allCounts[l] += 1
     self.totalIssueCnt = i+1
 
 
   def get_corr(self):
-    currentLabels = filter(lambda x: x in self.currentLabels, self.allCounts.keys())
-    myLabels = {k:i for i, k in enumerate(currentLabels)}
+    currentUsedLabels = filter(lambda x: x in self.currentLabels, self.allCounts.keys())
+    myLabels = {k:i for i, k in enumerate(currentUsedLabels)}
     numLabels = len(myLabels)
     corMat = [[0]* numLabels for i in range(numLabels)] #numLabels x numLabels matrix
-    with open(self.datafn, 'r') as f:
+    with open(self.datafn, 'r') as f: 
       dr = DictReader(f, fieldnames= self.fieldnames)
       for i, line in enumerate(dr):
         lineLabels = []
@@ -51,17 +52,23 @@ class IssueStats:
           theLabel = line[label]
           if theLabel in ["NULL", ""]:
             pass
+          elif ";" in theLabel:
+            lineLabels += theLabel.split(";")
           elif theLabel in self.currentLabels:
             lineLabels += theLabel, 
+        lineLabels = filter(lambda x: x in self.currentLabels, lineLabels)
         for a,b in product(lineLabels, lineLabels):
-          x,y = myLabels[a], myLabels[b]
+          try:
+            x,y = myLabels[a], myLabels[b]
+          except:
+            pass
           corMat[x][y] +=1
 
     highest = []
     for i, row in enumerate(corMat):
       ind, val = max( ( (j,col) for j, col in enumerate(row) if j != i), key=lambda x:x[1])
-      row_label = currentLabels[i]
-      highest.append((row_label, self.allCounts[row_label], currentLabels[ind], val, val*100./self.allCounts[row_label]))
+      row_label = currentUsedLabels[i]
+      highest.append((row_label, self.allCounts[row_label], currentUsedLabels[ind], val, val*100./self.allCounts[row_label]))
     print "Correlation Information"
     for fivel in sorted(highest, key=lambda x:x[-2], reverse=True):
       print "{:<30}\t{:3}\t{:<30}\t{:<3}\t{:2.2f}".format(*fivel)
@@ -166,7 +173,7 @@ if __name__ == "__main__":
   iStats = IssueStats()
   iStats.print_top_n()
   iStats.print_top_n(by_sub_cat=True)
-  iStats.print_counts(iStats.recently_deleted)
+  #iStats.print_counts(iStats.recently_deleted)
   #iStats.create_bar_chart()
   iStats.get_corr()
 
