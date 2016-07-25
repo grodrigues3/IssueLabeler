@@ -1,14 +1,8 @@
-"""TODO(grod): DO NOT SUBMIT without one-line documentation for simple_app.
-
-TODO(grod): DO NOT SUBMIT without a detailed description of simple_app.
-"""
-
 from flask import Flask, request
 from transform import DATAPERSISTENCE, load_model, load_sparse_csr, tokenize_stem_stop
 
-
-import pdb
 app = Flask(__name__)
+
 @app.route("/", methods = ["GET", "POST"])
 def handle_txt():
     team_mod = "pkld/trained_teams_model.pkl"
@@ -26,5 +20,6 @@ def handle_txt():
     vec = hasher.transform([tokens])
     tlabel = team_mod.predict(vec)[0]
     clabel = comp_mod.predict(vec)[0]
-    return ";".join([tlabel, clabel])
+    return ",".join([tlabel, clabel])
+
 app.run(host="0.0.0.0")
