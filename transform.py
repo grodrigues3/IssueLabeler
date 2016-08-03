@@ -196,7 +196,9 @@ def load_model(PICKLEFN):
   return joblib.load(PICKLEFN)
 
 if __name__ == "__main__":
-  titles, labels = get_titles_and_labels(which_label='component')
+  titles, labels = get_titles_and_labels(which_label='team')
+  print len(titles), len(labels)
+  """
   #save_sparse(DATAPERSISTENCE, tMat, labels, hasher)
   #best_params, best_score = perform_cross_validation(titles, labels)
   #print best_params, best_score
@@ -230,3 +232,4 @@ if __name__ == "__main__":
       data = tokenize_stem_stop(raw_input("Give me an example issue body\n"))
       example = myHasher.transform([data])
       print mod.predict(example)
+  """

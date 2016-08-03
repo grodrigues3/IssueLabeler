@@ -1,6 +1,5 @@
 from flask import Flask, request
 from transform import DATAPERSISTENCE, load_model, load_sparse_csr, tokenize_stem_stop
-
 app = Flask(__name__)
 
 @app.route("/", methods = ["GET", "POST"])
@@ -18,6 +17,7 @@ def handle_txt():
     team_mod = load_model(team_mod)
     comp_mod = load_model(comp_mod)
     vec = hasher.transform([tokens])
+    asdfafd 
     tlabel = team_mod.predict(vec)[0]
     clabel = comp_mod.predict(vec)[0]
     return ",".join([tlabel, clabel])
