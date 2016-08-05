@@ -8,18 +8,14 @@
 """
 from collections import defaultdict
 from sklearn.feature_extraction import FeatureHasher
-from sklearn.preprocessing import LabelEncoder
-from sklearn.linear_model import LassoCV
+from sklearn.preprocessing import LabelEncoder 
+from sklearn.linear_model import LassoCV 
 from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model import SGDClassifier
 from sklearn.cross_validation import train_test_split 
 from sklearn.metrics import confusion_matrix
 from sklearn.externals import joblib
 
-try:
-  from visualizations import plot_confusion_matrix
-except:
-  pass
 from nltk.stem.porter import PorterStemmer
 from nltk.tokenize import RegexpTokenizer
 import numpy as np
@@ -27,28 +23,27 @@ from scipy.sparse import csr_matrix
 import time
 from collections import Counter
 from get_issues_labels import IssueStats
-import pdb
 
-
-
-#Parameters
+# Parameters
 datafn = "./data/training_data.txt"
 labelfn = "./data/training_labels.txt"
 testfn = "./data/test_data.txt"
 DATAPERSISTENCE = "persistence/tMat_compOnly.npz"
-#PICKLEFN = "pkld/trained_teams_model.pkl"
-PICKLEFN = "pkld/trained_components_model.pkl"
+PICKLEFN = "pkld/trained_components_model.pkl" #"pkld/trained_teams_model.pkl"
+myStemmer = PorterStemmer()
+tokenizer = RegexpTokenizer(r'\w+')
+stopwords = None
 
+try:
+  if not stopwords:
+    stop_fn = "./data/stopwords.txt"
+  with open(stop_fn, 'r') as f:
+    stopwords = [word.strip() for word in f]
+except:
+  #don't remove any stopwords
+  stopwords = []
 
 def get_labels():
-  """
-  Load in the body and title
-    - remove punctuation
-    - remove stopwords
-    - stem the existing words
-  Load in the labels
-
-  """
   print "Loading Just The Labels..."
   labels = []
   iStats = IssueStats()
@@ -57,19 +52,6 @@ def get_labels():
     labels += data[1],
     counts[labels[-1]] += 1
   return labels, counts
-
-
-myStemmer = PorterStemmer()
-tokenizer = RegexpTokenizer(r'\w+')
-#stop_fn = raw_input("Provide a file containing stopwords with one word per line")
-try:
-  stop_words = []
-  if not stopwords:
-    stop_fn = "./data/stopwords.txt"
-  with open(stop_fn, 'r') as f:
-    stopwords = [word.strip() for word in f]
-except:
-  stopwords = [] #don't remove any stopwords
 
 def tokenize_stem_stop(inputString):
     curTitleBody = tokenizer.tokenize(inputString.decode('utf-8').lower())
@@ -89,12 +71,15 @@ def get_titles_and_labels(which_label='team'):
   for i, data in enumerate(iStats.get_training_examples(which_label=which_label)):
     titles_and_body += tokenize_stem_stop(data[0]),
     labels += data[1],
-    if ";" in labels[-1]:
-      pdb.set_trace()
   return titles_and_body, labels
 
 
 def encode_titles(titles, numFeatures= 2**14):
+  """
+  Encode the titles formatted as a string as numerical values using
+  the "hashing trick".  The size of the feature vector can be specified using the
+  numFeatures parameter"
+  """
   print "Encoding titles and labels to numerical values..."
   myHasher = FeatureHasher(input_type="string", n_features= numFeatures, non_negative=True)
   featureMatrix = myHasher.transform(titles)
@@ -103,30 +88,39 @@ def encode_titles(titles, numFeatures= 2**14):
 
 def build_lr_model(encoded_titles, encoded_labels, myLoss= 'log', myPenalty = 'l2', myAlpha = .0001):
   #print "Training a Model..."
-  myMod = SGDClassifier(loss=myLoss, penalty=myPenalty, alpha = myAlpha) #, alpha = .0001, class_weight = 'balanced') 
+  myMod = SGDClassifier(loss=myLoss, penalty=myPenalty, alpha = myAlpha) 
   myMod.fit(encoded_titles, encoded_labels)
   return myMod
 
 def test_model(model, hasher, testfn=None, testMat=None, testLabels=None):
   #print "Testing the Model..."
+  """
+  Three ways to test the existing model
+    1) pass in a testMat: a with the same column dimensionality as the training matrix
+    2) pass in a testFn
+    3) type your own title and body in to the raw_input field
+  """
   test_titles = []
   if testMat is None:
     if testfn is not None: 
       with open(testfn, 'r') as f:
         for line in f:
           info = line.split(",")
-          test_titles += [(" ".join(info[1:])).strip().split()]
-      test_titles = test_titles[:10]
+          test_titles += tokenize_stem_stop(info[1]), 
     else:
       cont = 1
       while cont:
         test_in = raw_input("Give me a sample issue title")
-        test_titles += test_in.split(),
+        test_titles += tokenize_stem_stop(test_in),
         cont = [0,1][raw_input("Add another issue title to test?")[0] == 'y']
     testMat = hasher.transform(test_titles)
   return model.score(testMat, testLabels)
 
 def count_words(titles):
+  """
+  To estimate the size of the feature vector as passed into the hashing trick,
+  count the vocabulary size (the number of unique tokens used in all titles and bodies)
+  """
   mySet = set()
   for title in titles:
     for word in title:
@@ -196,8 +190,9 @@ def load_model(PICKLEFN):
   return joblib.load(PICKLEFN)
 
 if __name__ == "__main__":
-  titles, labels = get_titles_and_labels(which_label='team')
-  print len(titles), len(labels)
+  titles, labels = get_titles_and_labels(which_label='component')
+  print len(titles), titles[:10]
+  print len(labels), labels[:10]
   """
   #save_sparse(DATAPERSISTENCE, tMat, labels, hasher)
   #best_params, best_score = perform_cross_validation(titles, labels)
