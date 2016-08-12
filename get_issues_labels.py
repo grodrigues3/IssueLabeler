@@ -4,8 +4,8 @@ from itertools import product
 
 
 class IssueStats:
+
   def __init__(self):
-    #self.datafn = "./data/raw_data.csv"
     self.datafn = "./data/manyLabels.csv"
     self.labels = ['area', 'component', 'team']
     self.fieldnames = ['body', 'title'] + self.labels
@@ -34,6 +34,17 @@ class IssueStats:
     self.totalIssueCnt = i+1
 
 
+  def count_words(self, titles):
+    """
+    To estimate the size of the feature vector as passed into the hashing trick,
+    count the vocabulary size (the number of unique tokens used in all titles and bodies)
+    """
+    myCounter = defaultdict(lambda: 0)
+    for titleBody, label in self.get_training_examples():
+      for word in titleBody.split():
+        myCounter[word] +=1 
+    return myCounter
+
   def get_corr(self):
     currentUsedLabels = filter(lambda x: x in self.currentLabels, self.allCounts.keys())
     myLabels = {k:i for i, k in enumerate(currentUsedLabels)}
@@ -53,10 +64,7 @@ class IssueStats:
             lineLabels += theLabel, 
         lineLabels = filter(lambda x: x in self.currentLabels, lineLabels)
         for a,b in product(lineLabels, lineLabels):
-          try:
-            x,y = myLabels[a], myLabels[b]
-          except:
-            pass
+          x,y = myLabels[a], myLabels[b]
           corMat[x][y] +=1
 
     highest = []
@@ -77,25 +85,34 @@ class IssueStats:
       print "{:>20}\t{}\t{:.3f}".format(k, count_dict[k], count_dict[k]*1./self.totalIssueCnt)
 
 
+  def get_labels(self, selector='team'):
+    print "Loading Just The Labels..."
+    counts = defaultdict(lambda:0)
+    for i, (line, labels) in enumerate(self.get_training_examples(which_label=selector)):
+      counts[labels] += 1
+    return counts
 
-  def get_training_examples(self, which_label='team'):
+  def get_training_examples(self, which_label=None):
+    """
+    Returns a generator of (lineBody (string), label (string)) pairs
+    """
+    print "Loading Titles and Labels To Be Used For Training Data..."
     with open(self.datafn, 'r') as f:
       dr = DictReader(f, fieldnames= self.fieldnames)
-
       for i, line in enumerate(dr):
-        if which_label in self.labels:
+        if which_label is not None and which_label in self.labels:
           if line[which_label] in ["NULL", ""]:
             continue
+          #can have multiple team labels 
           retLabel = line[which_label]
           if ";" in retLabel: #more than one team
             retLabel = max(retLabel.split(";"), key = self.allCounts.get)
         else:
+          #otherwise go through all labels and choose one thats used most often
           poss = []
           for label in self.labels:
             retLabel = line[label]
             if retLabel not in ["NULL", ""]:
-              #if ";" in retLabel: #more than one team
-                #retLabel = max(retLabel.split(";"), key = self.allCounts.get)
               poss += retLabel, 
           if not poss:
             continue
@@ -129,8 +146,9 @@ class IssueStats:
 
 if __name__ == "__main__":
   iStats = IssueStats()
-  iStats.print_top_n()
-  iStats.print_top_n(by_sub_cat=True)
+  #print iStats.get_labels()
+  #iStats.print_top_n()
+  #iStats.print_top_n(by_sub_cat=True)
   #iStats.print_counts(iStats.recently_deleted)
   #iStats.create_bar_chart()
   iStats.get_corr()
